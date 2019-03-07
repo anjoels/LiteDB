@@ -13,11 +13,11 @@ using System.Threading.Tasks;
 
 namespace LiteDB.Demo
 {
-    public class TestDeleteEngine
+    public class TestFullEngine
     {
         static Random RND = new Random();
-        static string PATH = @"D:\memory-file.db";
-        static string PATH_LOG = @"D:\memory-file-log.db";
+        static string PATH = @"D:\insert-vf.db";
+        static string PATH_LOG = @"D:\insert-vf-log.db";
 
         public static void Run(Stopwatch sw)
         {
@@ -27,27 +27,32 @@ namespace LiteDB.Demo
             var settings = new EngineSettings
             {
                 Filename = PATH,
-                CheckpointOnShutdown = false
+                CheckpointOnShutdown = true
             };
+
+            var query = new QueryDefinition();
+            var expr = BsonExpression.Create("_id = @p0");
+            query.Where.Add(expr);
 
             sw.Start();
 
             using (var db = new LiteEngine(settings))
             {
-                db.EnsureIndex("col1", "idx_1", "rnd", false);
+                Console.WriteLine("Insert...");
 
-                GetDocs(1, 4).ToList().ForEach(d => db.Insert("col1", new[] { d }, BsonAutoId.Int32));
+                var t0 = Task.Run(() => db.Insert("col1", GetDocs(1, 100000), BsonAutoId.Int32));
+                //var t1 = Task.Run(() => db.Insert("col2", GetDocs(1, 10000), BsonAutoId.ObjectId));
+                //var t2 = Task.Run(() => db.Insert("col3", GetDocs(1, 1000), BsonAutoId.Guid));
 
-                Console.WriteLine(db.CheckIntegrity());
-
-                db.Delete("col1", new BsonValue[] { 1, 2, 3, 4 });
-
-                db.Checkpoint(CheckpointMode.Full);
-
-                Console.WriteLine(db.CheckIntegrity());
+                Task.WaitAll(t0/*, t1, t2*/);
             }
 
             sw.Stop();
+
+            //using (var db = new LiteEngine(settings))
+            //{
+            //    db.CheckIntegrity();
+            //}
         }
 
         static IEnumerable<BsonDocument> GetDocs(int start, int count)
@@ -59,11 +64,11 @@ namespace LiteDB.Demo
                 yield return new BsonDocument
                 {
                     ["_id"] = i, // Guid.NewGuid(),
-                    ["rnd"] = Guid.NewGuid().ToString(),
+                    ["rnd"] = Guid.NewGuid(),
                     ["name"] = "NoSQL Database",
                     ["birthday"] = new DateTime(1977, 10, 30),
                     ["phones"] = new BsonArray { "000000", "12345678" },
-                    ["bytes"] = new byte[RND.Next(30, 1500)],
+                    ["bytes"] = new byte[750],
                     ["active"] = true
                 };
             }
